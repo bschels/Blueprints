@@ -141,17 +141,17 @@ action:
       light_mode: !input mode_light_mode
       target_entities: !input device_target_entities
       next_sunset: >
-        {{ as_datetime(state_attr('sun.sun', 'next_setting')) - timedelta(minutes=sunset_offset|int) }}
+        {{ as_datetime(state_attr("sun.sun", "next_setting")) - timedelta(minutes=sunset_offset | int) }}
       next_sunrise: >
-        {{ as_datetime(state_attr('sun.sun', 'next_rising')) + timedelta(minutes=sunrise_offset|int) }}
+        {{ as_datetime(state_attr("sun.sun", "next_rising")) + timedelta(minutes=sunrise_offset | int) }}
       is_dark: >
-        {{ (states('sun.sun') == 'below_horizon') or (utcnow() >= next_sunset and utcnow() < next_sunrise) }}
+        {{ (states("sun.sun") == "below_horizon") or (utcnow() >= next_sunset and utcnow() < next_sunrise) }}
       light_sensor_state: >
-        {{ states(light_sensor|string) if light_sensor else none }}
+        {{ states(light_sensor | string) if light_sensor else none }}
       darkness_detected: >
-        {{ always_on_mode or (light_sensor_state == 'dark') if use_light_sensor else is_dark }}
+        {{ (always_on_mode or (light_sensor_state == "dark")) if use_light_sensor else is_dark }}
       selected_transition: >
-        {{ transition_time if light_mode == 'smooth' else 0 }}
+        {{ transition_time if light_mode == "smooth" else 0 }}
 
   - service: zha.set_zigbee_cluster_attribute
     data:
@@ -195,7 +195,7 @@ action:
       - conditions:
           - condition: template
             value_template: >
-              {{ expand(target_entities.entity_id) | selectattr('state', 'eq', 'on') | list | count > 0 }}
+              {{ expand(target_entities.entity_id) | selectattr("state", "eq", "on") | list | count > 0 }}
         sequence:
           - delay:
               minutes: !input timing_override_timeout
