@@ -1,0 +1,142 @@
+blueprint:
+  name: "Smart Relay Control (Sonoff Mini R4M with SonoffLAN)"
+  description: >
+    This blueprint is designed exclusively for the **Sonoff Mini R4M** when used with the **SonoffLAN** integration.
+    
+    The Mini R4M can operate in two modes:
+    
+    **Detached Mode (Smart Control):**
+    - In this mode, the Mini R4M is set to detached relay mode so that it sends a single, clear action signal (e.g., "single", "double", "long")
+      without automatically toggling its relay.
+    - Use this mode to control smart devices such as lights or trigger scenes.
+    - **Configuration:** Assign the sensor entity (which reports the button actions) to **Action Sensor** and select a smart light for **Target Smart Light**.
+      Optionally, you can choose a scene for a double tap and set a dimming increment for a long press.
+    
+    **Relay Mode (Direct Relay Control):**
+    - In this mode, the same action sensor is used, but you also provide the relay entity from the Mini R4M (exposed via SonoffLAN) to control a non‑smart device.
+    - The blueprint uses the sensor event to trigger a `switch.toggle` on the relay entity.
+    - **Configuration:** Assign the sensor entity to **Action Sensor** and the Mini R4M's relay (switch entity) to **Non-Smart Device (Relay Mode)**.
+    
+    **Note:** The blueprint does not differentiate between momentary and rocker switches—only the action events matter.
+    
+  domain: automation
+
+  input:
+    action_sensor:
+      name: "Action Sensor"
+      description: >
+        Select the sensor entity that reports the button press actions from your Sonoff Mini R4M.
+        This sensor should send states like "single", "double", or "long" depending on the type of press.
+      selector:
+        entity:
+          domain: sensor
+
+    relay_mode:
+      name: "Relay Control Mode"
+      description: >
+        Choose the control mode:
+          - **detached:** Use this mode for smart control (e.g., toggling a smart light or triggering a scene).
+          - **relay:** Use this mode to directly toggle the relay of the Mini R4M (for non‑smart devices).
+      default: detached
+      selector:
+        select:
+          options:
+            - detached
+            - relay
+
+    target_light:
+      name: "Target Smart Light"
+      description: >
+        (Detached mode only) Select a smart light to control with the action sensor events.
+        A single tap toggles the light, a double tap can trigger a scene, and a long press adjusts brightness.
+      selector:
+        entity:
+          domain: light
+      default: ""
+
+    target_other:
+      name: "Non-Smart Device (Relay Mode)"
+      description: >
+        (Relay mode only) Select the switch entity representing the Mini R4M's relay.
+        This is toggled directly when an action sensor event occurs.
+      selector:
+        entity:
+          domain: switch
+      default: ""
+
+    double_tap_scene:
+      name: "Double Tap Scene"
+      description: >
+        (Detached mode only) Optionally, select a scene to trigger when a double tap is detected.
+      selector:
+        entity:
+          domain: scene
+      default: ""
+
+    dimming_increment:
+      name: "Dimming Increment"
+      description: >
+        (Detached mode only) Specify the brightness change per long press step (in percentage).
+      default: 20
+      selector:
+        number:
+          min: 5
+          max: 50
+          unit_of_measurement: "%"
+
+trigger:
+  - platform: state
+    entity_id: !input action_sensor
+
+condition: []
+
+action:
+  - choose:
+      # Detached Mode (Smart Control) for smart devices (lights/scenes)
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ relay_mode == 'detached' and trigger.to_state.state in ['single', 'double', 'long'] and target_light != '' }}
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.to_state.state == 'single' }}"
+                sequence:
+                  - service: light.toggle
+                    target:
+                      entity_id: !input target_light
+
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ trigger.to_state.state == 'double' and double_tap_scene != '' }}
+                sequence:
+                  - service: scene.turn_on
+                    target:
+                      entity_id: !input double_tap_scene
+
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.to_state.state == 'long' }}"
+                sequence:
+                  - variables:
+                      current_brightness: "{{ state_attr(target_light, 'brightness') | int | default(0) }}"
+                      new_brightness: "{{ [current_brightness + dimming_increment, 255] | min }}"
+                  - service: light.turn_on
+                    target:
+                      entity_id: !input target_light
+                    data:
+                      brightness: "{{ new_brightness }}"
+
+      # Relay Mode (Direct Relay Control) for non-smart devices
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ relay_mode == 'relay' and trigger.to_state.state in ['single', 'double'] and target_other != '' }}
+        sequence:
+          - service: switch.toggle
+            target:
+              entity_id: !input target_other
+
+mode: restart
