@@ -10,164 +10,143 @@ blueprint:
     - **Always On Mode**: Ignores light conditions and always turns on the selected devices when presence is detected.
   domain: automation
   input:
-    sensor_settings:
-      name: "Sensor Settings"
-      icon: mdi:motion-sensor-outline
-      description: "Configure presence and light sensors."
-      collapsed: true
-      input:
-        presence_sensor:
-          name: "Presence Sensor"
-          description: "Select the Sonoff SNZB-06P Human Presence Sensor."
-          selector:
-            entity:
-              domain: binary_sensor
-              device_class: occupancy
-        presence_sensitivity:
-          name: "Presence Sensitivity"
-          description: "Adjust the detection sensitivity of the Sonoff SNZB-06P sensor."
-          default: "medium"
-          selector:
-            select:
-              options:
-                - value: "low"
-                  label: "Low (2.5 meters)"
-                - value: "medium"
-                  label: "Medium (3.5 meters)"
-                - value: "high"
-                  label: "High (4 meters)"
-        light_sensor:
-          name: "Light Sensor (Optional)"
-          description: >
-            Select a light sensor for detecting light/dark conditions. 
-            This is usually a sensor entity with an attribute like `illuminance` or `last_illumination_state`.
-            Leave empty to use the sun position instead.
-          default: null
-          selector:
-            entity:
-              domain: sensor
-        use_light_sensor:
-          name: "Use Light Sensor Instead of Sun"
-          description: "Enable this to use the light sensor for darkness detection instead of the sun position."
-          default: false
-          selector:
-            boolean: {}
-    mode_settings:
-      name: "Mode Settings"
-      icon: mdi:weather-night
-      description: "Configure operational modes."
-      collapsed: true
-      input:
-        always_on_mode:
-          name: "Always On Mode"
-          description: >
-            Enable this to always turn on devices when presence is detected, ignoring light conditions. 
-            This is useful for non-light devices (e.g., switches, outlets) or if you want lights to turn on regardless of darkness.
-            
-            **Adaptive Lighting Support:**  
-            If you use the **Adaptive Lighting** integration, this mode works perfectly with it, allowing lights to adjust brightness and color temperature dynamically.  
-            More about Adaptive Lighting: [GitHub](https://github.com/basnijholt/adaptive-lighting)
-          default: false
-          selector:
-            boolean: {}
-        light_mode:
-          name: "Lighting Mode"
-          description: "Choose between instant or smooth transitions (only for lights)."
-          default: "instant"
-          selector:
-            select:
-              options:
-                - value: "instant"
-                  label: "Instant (On/Off Immediately)"
-                - value: "smooth"
-                  label: "Smooth (Fade In/Out, for lights only)"
-    device_settings:
-      name: "Devices"
-      icon: mdi:toggle-switch-outline
+    # Sensor Settings
+    sensor_presence_sensor:
+      name: "Presence Sensor"
+      description: "Select the Sonoff SNZB-06P Human Presence Sensor."
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: occupancy
+    sensor_presence_sensitivity:
+      name: "Presence Sensitivity"
+      description: "Adjust the detection sensitivity of the sensor."
+      default: "medium"
+      selector:
+        select:
+          options:
+            - value: "low"
+              label: "Low (2.5 meters)"
+            - value: "medium"
+              label: "Medium (3.5 meters)"
+            - value: "high"
+              label: "High (4 meters)"
+    sensor_light_sensor:
+      name: "Light Sensor (Optional)"
+      description: >
+        Select a light sensor for detecting light/dark conditions.
+        This is usually a sensor entity with an attribute like `illuminance` or `last_illumination_state`.
+        Leave empty to use the sun position instead.
+      default: null
+      selector:
+        entity:
+          domain: sensor
+    sensor_use_light_sensor:
+      name: "Use Light Sensor Instead of Sun"
+      description: "Enable this to use the light sensor for darkness detection instead of the sun position."
+      default: false
+      selector:
+        boolean: {}
+    # Mode Settings
+    mode_always_on_mode:
+      name: "Always On Mode"
+      description: >
+        Enable this to always turn on devices when presence is detected,
+        ignoring light conditions.
+        
+        **Adaptive Lighting Support:**  
+        If you use the **Adaptive Lighting** integration, this mode works perfectly with it.
+      default: false
+      selector:
+        boolean: {}
+    mode_light_mode:
+      name: "Lighting Mode"
+      description: "Choose between instant or smooth transitions (for lights only)."
+      default: "instant"
+      selector:
+        select:
+          options:
+            - value: "instant"
+              label: "Instant (On/Off Immediately)"
+            - value: "smooth"
+              label: "Smooth (Fade In/Out)"
+    # Device Settings
+    device_target_entities:
+      name: "Devices to Control"
       description: "Select the devices to control (lights, switches, outlets, etc.)."
-      collapsed: true
-      input:
-        target_entities:
-          name: "Devices to Control"
-          description: "Select the devices to control."
-          selector:
-            target:
-              entity: {}
-    timing_settings:
-      name: "Timing & Offsets"
-      icon: mdi:clock-outline
-      description: "Set offsets, timeouts, and transition times."
-      collapsed: true
-      input:
-        sunset_offset:
-          name: "Sunset Offset (Minutes)"
-          description: "Devices turn on this many minutes before sunset."
-          default: 30
-          selector:
-            number:
-              min: 0
-              max: 120
-              unit_of_measurement: "min"
-        sunrise_offset:
-          name: "Sunrise Offset (Minutes)"
-          description: "Devices turn off this many minutes after sunrise."
-          default: 30
-          selector:
-            number:
-              min: 0
-              max: 120
-              unit_of_measurement: "min"
-        motion_timeout:
-          name: "Presence Timeout"
-          description: "Time in seconds before turning off devices after presence is lost."
-          default: 120
-          selector:
-            number:
-              min: 10
-              max: 600
-              unit_of_measurement: seconds
-        override_timeout:
-          name: "Manual Override Duration"
-          description: "Time in minutes before automation resumes after manual device adjustment."
-          default: 10
-          selector:
-            number:
-              min: 1
-              max: 60
-              unit_of_measurement: minutes
-        transition_time:
-          name: "Smooth Transition Time"
-          description: "Time in seconds for smooth transitions (for compatible lights)."
-          default: 2
-          selector:
-            number:
-              min: 0
-              max: 10
-              unit_of_measurement: seconds
+      selector:
+        target:
+          entity: {}
+    # Timing & Offsets
+    timing_sunset_offset:
+      name: "Sunset Offset (Minutes)"
+      description: "Devices turn on this many minutes before sunset."
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 120
+          unit_of_measurement: "min"
+    timing_sunrise_offset:
+      name: "Sunrise Offset (Minutes)"
+      description: "Devices turn off this many minutes after sunrise."
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 120
+          unit_of_measurement: "min"
+    timing_motion_timeout:
+      name: "Presence Timeout (Seconds)"
+      description: "Time in seconds before turning off devices after presence is lost."
+      default: 120
+      selector:
+        number:
+          min: 10
+          max: 600
+          unit_of_measurement: seconds
+    timing_override_timeout:
+      name: "Manual Override Duration (Minutes)"
+      description: "Time in minutes before automation resumes after manual device adjustment."
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: minutes
+    timing_transition_time:
+      name: "Smooth Transition Time (Seconds)"
+      description: "Time in seconds for smooth transitions (for compatible lights)."
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 10
+          unit_of_measurement: seconds
 
 trigger:
   - platform: state
-    entity_id: !input sensor_settings.presence_sensor
+    entity_id: !input sensor_presence_sensor
     to: "on"
   - platform: state
-    entity_id: !input sensor_settings.presence_sensor
+    entity_id: !input sensor_presence_sensor
     to: "off"
     for:
-      seconds: !input timing_settings.motion_timeout
+      seconds: !input timing_motion_timeout
 
 condition: []
 
 action:
   - variables:
-      sunset_offset: !input timing_settings.sunset_offset
-      sunrise_offset: !input timing_settings.sunrise_offset
-      use_light_sensor: !input sensor_settings.use_light_sensor
-      always_on_mode: !input mode_settings.always_on_mode
-      light_sensor: !input sensor_settings.light_sensor
-      transition_time: !input timing_settings.transition_time
-      presence_sensitivity: !input sensor_settings.presence_sensitivity
-      light_mode: !input mode_settings.light_mode
-      target_entities: !input device_settings.target_entities
+      sunset_offset: !input timing_sunset_offset
+      sunrise_offset: !input timing_sunrise_offset
+      use_light_sensor: !input sensor_use_light_sensor
+      always_on_mode: !input mode_always_on_mode
+      light_sensor: !input sensor_light_sensor
+      transition_time: !input timing_transition_time
+      presence_sensitivity: !input sensor_presence_sensitivity
+      light_mode: !input mode_light_mode
+      target_entities: !input device_target_entities
       next_sunset: >
         {{ as_datetime(state_attr('sun.sun', 'next_setting')) - timedelta(minutes=sunset_offset | int) }}
       next_sunrise: >
@@ -183,7 +162,7 @@ action:
 
   - service: zha.set_zigbee_cluster_attribute
     data:
-      ieee: "{{ device_attr(!input sensor_settings.presence_sensor, 'ieee') }}"
+      ieee: "{{ device_attr(!input sensor_presence_sensor, 'ieee') }}"
       endpoint_id: 1
       cluster_id: 64528
       cluster_type: "in"
@@ -200,36 +179,35 @@ action:
   - choose:
       - conditions:
           - condition: state
-            entity_id: !input sensor_settings.presence_sensor
+            entity_id: !input sensor_presence_sensor
             state: "on"
           - condition: template
             value_template: "{{ darkness_detected }}"
         sequence:
           - service: homeassistant.turn_on
-            target: !input device_settings.target_entities
+            target: !input device_target_entities
             data:
               transition: "{{ selected_transition }}"
       - conditions:
           - condition: state
-            entity_id: !input sensor_settings.presence_sensor
+            entity_id: !input sensor_presence_sensor
             state: "off"
         sequence:
           - delay:
-              seconds: !input timing_settings.motion_timeout
+              seconds: !input timing_motion_timeout
           - service: homeassistant.turn_off
-            target: !input device_settings.target_entities
+            target: !input device_target_entities
             data:
               transition: "{{ selected_transition }}"
       - conditions:
           - condition: template
             value_template: >
-              {% set entities = target_entities.entity_id %}
-              {{ expand(entities) | selectattr('state', 'eq', 'on') | list | count > 0 }}
+              {{ expand(target_entities.entity_id) | selectattr('state', 'eq', 'on') | list | count > 0 }}
         sequence:
           - delay:
-              minutes: !input timing_settings.override_timeout
+              minutes: !input timing_override_timeout
           - service: homeassistant.turn_off
-            target: !input device_settings.target_entities
+            target: !input device_target_entities
             data:
               transition: "{{ selected_transition }}"
 
