@@ -6,16 +6,17 @@ blueprint:
     It supports two modes:
     
     **Detached Mode (Smart Control):**
-      - The Mini R4M is set to detached relay mode so it sends a clear action signal
-        ("single", "double", or "long") without toggling its relay automatically.
-      - Use this mode to control any smart entity.
-        - **Single Tap:** If the target entity is a light (ID begins with "light."), it toggles via light.toggle; otherwise it uses homeassistant.toggle.
-        - **Double Tap:** Triggers an optional scene.
-        - **Long Press:** (For rocker switches only) Adjusts brightness—but only if the target is a light. Use the Dimming Increment and Dimming Direction to set the step and whether brightness increases or decreases.
+      - Set the Mini R4M to detached relay mode so it sends a clear action signal ("single", "double", or "long")
+        without toggling its relay automatically.
+      - Control any smart entity:
+          - **Single Tap:**  
+            If the entity’s ID starts with "light.", it toggles via light.toggle; otherwise, it uses homeassistant.toggle.
+          - **Double Tap:** Optionally trigger a scene.
+          - **Long Press:** Adjusts brightness (only for lights) using the specified increment and direction.
     
     **Relay Mode (Direct Relay Control):**
-      - In this mode the action sensor (from the Mini R4M) triggers a direct toggle of the relay.
-      - You must provide the relay (switch) entity for this mode.
+      - The action sensor triggers a direct toggle of the relay.
+      - Provide the relay (switch) entity representing the Mini R4M’s relay.
     
     **Setup:**
       - **Action Sensor:** Select the sensor that reports the Mini R4M’s button events.
@@ -51,7 +52,9 @@ blueprint:
       name: "Target Entity (Smart Control)"
       description: >
         (Detached mode only) Select any smart entity to control.
-        - **Single Tap:** If the entity’s ID begins with "light.", it toggles via light.toggle; otherwise, it uses homeassistant.toggle.
+        - **Single Tap:**  
+          If the entity’s ID begins with "light.", it toggles via light.toggle;
+          otherwise, it uses homeassistant.toggle.
         - **Double Tap:** Optionally trigger a scene.
         - **Long Press:** Adjust brightness if the entity is a light.
       selector:
@@ -138,7 +141,7 @@ action:
                     target:
                       entity_id: !input double_tap_scene
           - choose:
-              # Long Press: Adjust brightness (only works if target is a light).
+              # Long Press: Adjust brightness (only if target is a light).
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.to_state.state == 'long' and target_entity.startswith('light.') }}"
