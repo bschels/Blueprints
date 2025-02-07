@@ -1,26 +1,26 @@
 blueprint:
   name: "Smart Relay Control (Sonoff Mini R4M with SonoffLAN)"
   description: >
-    This blueprint is designed exclusively for the **Sonoff Mini R4M** when used with the **SonoffLAN** integration.
-
-    The Mini R4M can be used in two modes:
-
+    This blueprint is designed for the Sonoff Mini R4M using the SonoffLAN integration.
+    
+    It supports two modes:
+    
     **Detached Mode (Smart Control):**
-    - The Mini R4M is set to detached relay mode so it sends a single, clear action signal (such as "single", "double", or "long")
-      without toggling its relay automatically.
-    - Use this mode to control smart devices (for example, a smart light or a scene).
-    - **Long press functionality is intended for rocker switches only.** In this case, you can adjust brightness.
-      You can choose whether a long press will increase or decrease brightness via the "Dimming Direction" option.
-
+      - The Mini R4M is set to detached relay mode so it sends a clear action signal
+        ("single", "double", or "long") without toggling its relay automatically.
+      - Use this mode to control any smart entity.
+        - **Single Tap:** If the target entity is a light (ID begins with "light."), it toggles via light.toggle; otherwise it uses homeassistant.toggle.
+        - **Double Tap:** Triggers an optional scene.
+        - **Long Press:** (For rocker switches only) Adjusts brightness—but only if the target is a light. Use the Dimming Increment and Dimming Direction to set the step and whether brightness increases or decreases.
+    
     **Relay Mode (Direct Relay Control):**
-    - In this mode, the same action sensor is used, but you also provide the relay (switch) entity from the Mini R4M.
-    - The blueprint uses the sensor event to trigger a `switch.toggle` on the relay entity.
-
+      - In this mode the action sensor (from the Mini R4M) triggers a direct toggle of the relay.
+      - You must provide the relay (switch) entity for this mode.
+    
     **Setup:**
-      - **Action Sensor:** Select the sensor that reports the button events.
-      - For **detached mode** (smart control), assign your target smart light (and optionally a scene for double tap).
-      - For **relay mode**, assign the Mini R4M's relay (switch) entity.
-      - **Dimming Options:** The "Dimming Increment" defines the step size. The "Dimming Direction" sets whether a long press increases ("up") or decreases ("down") brightness.
+      - **Action Sensor:** Select the sensor that reports the Mini R4M’s button events.
+      - For detached mode, assign your target smart entity.
+      - For relay mode, assign the Mini R4M’s relay (switch) entity.
       
   domain: automation
 
@@ -28,18 +28,18 @@ blueprint:
     action_sensor:
       name: "Action Sensor"
       description: >
-        Select the sensor entity that reports the button press actions from your Sonoff Mini R4M.
-        This sensor should send states like "single", "double", or "long" depending on the press.
+        Select the sensor entity that reports the button press events
+        ("single", "double", or "long") from your Sonoff Mini R4M.
       selector:
         entity:
           domain: sensor
 
     relay_mode:
-      name: "Relay Control Mode"
+      name: "Control Mode"
       description: >
         Choose the control mode:
-          - **detached:** Use this mode for smart control (e.g., toggling a smart light or triggering a scene).
-          - **relay:** Use this mode to directly toggle the relay of the Mini R4M (for non‑smart devices).
+          - **detached:** For smart control of an entity (with optional brightness control for lights).
+          - **relay:** To directly toggle the Mini R4M’s relay.
       default: detached
       selector:
         select:
@@ -47,21 +47,21 @@ blueprint:
             - detached
             - relay
 
-    target_light:
-      name: "Target Smart Light"
+    target_entity:
+      name: "Target Entity (Smart Control)"
       description: >
-        (Detached mode only) Select a smart light to control with the action sensor events.
-        A single tap toggles the light, a double tap can trigger a scene, and a long press adjusts brightness.
+        (Detached mode only) Select any smart entity to control.
+        - **Single Tap:** If the entity’s ID begins with "light.", it toggles via light.toggle; otherwise, it uses homeassistant.toggle.
+        - **Double Tap:** Optionally trigger a scene.
+        - **Long Press:** Adjust brightness if the entity is a light.
       selector:
-        entity:
-          domain: light
-      default: ""
+        entity: {}
 
     target_other:
-      name: "Non-Smart Device (Relay Mode)"
+      name: "Relay Entity (Relay Mode)"
       description: >
-        (Relay mode only) Select the switch entity representing the Mini R4M's relay.
-        This is toggled directly when an action sensor event occurs.
+        (Relay mode only) Select the switch entity representing the Mini R4M’s relay.
+        This entity will be toggled directly.
       selector:
         entity:
           domain: switch
@@ -70,7 +70,7 @@ blueprint:
     double_tap_scene:
       name: "Double Tap Scene"
       description: >
-        (Detached mode only) Optionally, select a scene to trigger when a double tap is detected.
+        (Detached mode only) Optionally, select a scene to trigger on a double tap.
       selector:
         entity:
           domain: scene
@@ -79,7 +79,7 @@ blueprint:
     dimming_increment:
       name: "Dimming Increment"
       description: >
-        (Detached mode only, rocker switches) Specify the brightness change per long press step (in percentage).
+        (Detached mode only, for lights) Specify the brightness step (in %) for a long press.
       default: 20
       selector:
         number:
@@ -90,9 +90,7 @@ blueprint:
     dimming_direction:
       name: "Dimming Direction"
       description: >
-        (Detached mode only, rocker switches) Choose the brightness adjustment direction for a long press:
-          - **up:** Increases brightness.
-          - **down:** Decreases brightness.
+        (Detached mode only, for lights) Choose whether a long press increases or decreases brightness.
       default: up
       selector:
         select:
@@ -108,25 +106,29 @@ condition: []
 
 action:
   - choose:
-      # Detached Mode (Smart Control)
+      # Detached Mode: Smart Control
       - conditions:
           - condition: template
             value_template: >
               {{ relay_mode == 'detached'
                  and trigger.to_state.state in ['single', 'double', 'long']
-                 and target_light != '' }}
+                 and target_entity != '' }}
         sequence:
           - choose:
-              # Single tap: Toggle the smart light.
+              # Single Tap: Toggle target entity.
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.to_state.state == 'single' }}"
+                    value_template: "{{ target_entity.startswith('light.') }}"
                 sequence:
                   - service: light.toggle
                     target:
-                      entity_id: !input target_light
-
-              # Double tap: Trigger the selected scene.
+                      entity_id: !input target_entity
+              - default:
+                  - service: homeassistant.toggle
+                    target:
+                      entity_id: !input target_entity
+          - choose:
+              # Double Tap: Trigger scene if provided.
               - conditions:
                   - condition: template
                     value_template: >
@@ -135,14 +137,14 @@ action:
                   - service: scene.turn_on
                     target:
                       entity_id: !input double_tap_scene
-
-              # Long press: Adjust brightness (for rocker switches only).
+          - choose:
+              # Long Press: Adjust brightness (only works if target is a light).
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.to_state.state == 'long' }}"
+                    value_template: "{{ trigger.to_state.state == 'long' and target_entity.startswith('light.') }}"
                 sequence:
                   - variables:
-                      current_brightness: "{{ state_attr(target_light, 'brightness') | int | default(0) }}"
+                      current_brightness: "{{ state_attr(target_entity, 'brightness') | int | default(0) }}"
                       new_brightness: >
                         {% if dimming_direction == 'up' %}
                           {{ [current_brightness + dimming_increment, 255] | min }}
@@ -151,11 +153,11 @@ action:
                         {% endif %}
                   - service: light.turn_on
                     target:
-                      entity_id: !input target_light
+                      entity_id: !input target_entity
                     data:
                       brightness: "{{ new_brightness }}"
 
-      # Relay Mode (Direct Relay Control)
+      # Relay Mode: Direct Relay Control
       - conditions:
           - condition: template
             value_template: >
