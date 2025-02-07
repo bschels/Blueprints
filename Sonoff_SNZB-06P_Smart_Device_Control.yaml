@@ -51,7 +51,7 @@ blueprint:
           description: "Enable this to use the light sensor for darkness detection instead of the sun position."
           default: false
           selector:
-            boolean:
+            boolean: {}
     mode_settings:
       name: "Mode Settings"
       icon: mdi:weather-night
@@ -69,7 +69,7 @@ blueprint:
             More about Adaptive Lighting: [GitHub](https://github.com/basnijholt/adaptive-lighting)
           default: false
           selector:
-            boolean:
+            boolean: {}
         light_mode:
           name: "Lighting Mode"
           description: "Choose between instant or smooth transitions (only for lights)."
@@ -89,7 +89,7 @@ blueprint:
       input:
         target_entities:
           name: "Devices to Control"
-          description: "Select the devices to control (lights, switches, outlets, etc.)."
+          description: "Select the devices to control."
           selector:
             target:
               entity: {}
@@ -167,7 +167,7 @@ action:
       transition_time: !input timing_settings.transition_time
       presence_sensitivity: !input sensor_settings.presence_sensitivity
       light_mode: !input mode_settings.light_mode
-
+      target_entities: !input device_settings.target_entities
       next_sunset: >
         {{ as_datetime(state_attr('sun.sun', 'next_setting')) - timedelta(minutes=sunset_offset | int) }}
       next_sunrise: >
@@ -223,7 +223,8 @@ action:
       - conditions:
           - condition: template
             value_template: >
-              {{ expand(states) | selectattr('entity_id', 'in', device_settings.target_entities.entity_id) | selectattr('state', 'eq', 'on') | list | count > 0 }}
+              {% set entities = target_entities.entity_id %}
+              {{ expand(entities) | selectattr('state', 'eq', 'on') | list | count > 0 }}
         sequence:
           - delay:
               minutes: !input timing_settings.override_timeout
