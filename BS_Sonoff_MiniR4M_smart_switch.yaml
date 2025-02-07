@@ -28,19 +28,12 @@ blueprint:
   input:
     action_sensor:
       name: "Action Sensor"
-      description: >
-        Select the sensor entity that reports the button press events
-        ("single", "double", or "long") from your Sonoff Mini R4M.
       selector:
         entity:
           domain: sensor
 
     relay_mode:
       name: "Control Mode"
-      description: >
-        Choose the control mode:
-          - **detached:** For smart control of an entity (with optional brightness control for lights).
-          - **relay:** To directly toggle the Mini R4M’s relay.
       default: detached
       selector:
         select:
@@ -50,21 +43,11 @@ blueprint:
 
     target_entity:
       name: "Target Entity (Smart Control)"
-      description: >
-        (Detached mode only) Select any smart entity to control.
-        - **Single Tap:**  
-          If the entity’s ID begins with "light.", it toggles via light.toggle;
-          otherwise, it uses homeassistant.toggle.
-        - **Double Tap:** Optionally trigger a scene.
-        - **Long Press:** Adjust brightness if the entity is a light.
       selector:
         entity: {}
 
     target_other:
       name: "Relay Entity (Relay Mode)"
-      description: >
-        (Relay mode only) Select the switch entity representing the Mini R4M’s relay.
-        This entity will be toggled directly.
       selector:
         entity:
           domain: switch
@@ -72,8 +55,6 @@ blueprint:
 
     double_tap_scene:
       name: "Double Tap Scene"
-      description: >
-        (Detached mode only) Optionally, select a scene to trigger on a double tap.
       selector:
         entity:
           domain: scene
@@ -81,8 +62,6 @@ blueprint:
 
     dimming_increment:
       name: "Dimming Increment"
-      description: >
-        (Detached mode only, for lights) Specify the brightness step (in %) for a long press.
       default: 20
       selector:
         number:
@@ -92,8 +71,6 @@ blueprint:
 
     dimming_direction:
       name: "Dimming Direction"
-      description: >
-        (Detached mode only, for lights) Choose whether a long press increases or decreases brightness.
       default: up
       selector:
         select:
@@ -108,11 +85,6 @@ trigger:
 condition: []
 
 action:
-  - service: persistent_notification.create
-    data:
-      title: "Debugging Inputs"
-      message: "Target Entity: {{ target_entity }} | Relay Entity: {{ target_other }} | Scene: {{ double_tap_scene }}"
-
   - choose:
       # Detached Mode: Smart Control
       - conditions:
@@ -120,7 +92,7 @@ action:
             value_template: >
               {{ relay_mode == 'detached'
                  and trigger.to_state.state in ['single', 'double', 'long']
-                 and target_entity is not none and target_entity != '' }}
+                 and target_entity is defined and target_entity | string | length > 0 }}
         sequence:
           - choose:
               # Single Tap: Toggle target entity.
@@ -131,26 +103,29 @@ action:
                   - service: light.toggle
                     target:
                       entity_id: !input target_entity
-              - default:
+              - conditions:
                   - condition: template
-                    value_template: "{{ target_entity is not none and target_entity != '' }}"
+                    value_template: "{{ not target_entity.startswith('light.') }}"
+                sequence:
                   - service: homeassistant.toggle
                     target:
                       entity_id: !input target_entity
+
+          # Double Tap: Trigger scene if provided.
           - choose:
-              # Double Tap: Trigger scene if provided.
               - conditions:
                   - condition: template
                     value_template: >
                       {{ trigger.to_state.state == 'double' 
-                         and double_tap_scene is not none 
-                         and double_tap_scene != '' }}
+                         and double_tap_scene is defined 
+                         and double_tap_scene | string | length > 0 }}
                 sequence:
                   - service: scene.turn_on
                     target:
                       entity_id: !input double_tap_scene
+
+          # Long Press: Adjust brightness (only if target is a light).
           - choose:
-              # Long Press: Adjust brightness (only if target is a light).
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.to_state.state == 'long' and target_entity.startswith('light.') }}"
@@ -175,7 +150,7 @@ action:
             value_template: >
               {{ relay_mode == 'relay'
                  and trigger.to_state.state in ['single', 'double']
-                 and target_other is not none and target_other != '' }}
+                 and target_other is defined and target_other | string | length > 0 }}
         sequence:
           - service: switch.toggle
             target:
