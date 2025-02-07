@@ -108,6 +108,11 @@ trigger:
 condition: []
 
 action:
+  - service: persistent_notification.create
+    data:
+      title: "Debugging Inputs"
+      message: "Target Entity: {{ target_entity }} | Relay Entity: {{ target_other }} | Scene: {{ double_tap_scene }}"
+
   - choose:
       # Detached Mode: Smart Control
       - conditions:
@@ -115,7 +120,7 @@ action:
             value_template: >
               {{ relay_mode == 'detached'
                  and trigger.to_state.state in ['single', 'double', 'long']
-                 and target_entity != '' }}
+                 and target_entity is not none and target_entity != '' }}
         sequence:
           - choose:
               # Single Tap: Toggle target entity.
@@ -127,6 +132,8 @@ action:
                     target:
                       entity_id: !input target_entity
               - default:
+                  - condition: template
+                    value_template: "{{ target_entity is not none and target_entity != '' }}"
                   - service: homeassistant.toggle
                     target:
                       entity_id: !input target_entity
@@ -135,7 +142,9 @@ action:
               - conditions:
                   - condition: template
                     value_template: >
-                      {{ trigger.to_state.state == 'double' and double_tap_scene != '' }}
+                      {{ trigger.to_state.state == 'double' 
+                         and double_tap_scene is not none 
+                         and double_tap_scene != '' }}
                 sequence:
                   - service: scene.turn_on
                     target:
@@ -166,7 +175,7 @@ action:
             value_template: >
               {{ relay_mode == 'relay'
                  and trigger.to_state.state in ['single', 'double']
-                 and target_other != '' }}
+                 and target_other is not none and target_other != '' }}
         sequence:
           - service: switch.toggle
             target:
