@@ -1,13 +1,24 @@
 blueprint:
   name: "Sonoff SNZB-06P Smart Device Control"
   description: >
-    This blueprint automates device control using the **Sonoff SNZB-06P Human Presence Sensor**.
-    It turns devices on when presence is detected, with optional darkness detection.
-    
-    **Lighting Modes:**
-    - **Instant**: Devices turn on/off immediately.
-    - **Smooth**: Devices fade in/out over a configurable transition time (for compatible lights).
-    - **Always On Mode**: Ignores light conditions and always turns on the selected devices when presence is detected.
+    This blueprint automates device control using the Sonoff SNZB-06P Human Presence Sensor.
+    When presence is detected, it turns on your selected devices—typically lights, switches, or outlets—
+    while taking ambient light conditions into account.
+
+    **Features:**
+    - **Adaptive Darkness Detection:**  
+      The blueprint determines darkness either by a dedicated light sensor (if enabled) or by using sun data with configurable sunset/sunrise offsets.
+    - **Always On Mode:**  
+      When enabled, this mode forces the devices on regardless of the ambient light.
+      This is ideal for use with the Adaptive Lighting add-on. For more details, see [Adaptive Lighting on GitHub](https://github.com/basnijholt/adaptive-lighting).
+    - **Lighting Modes:**  
+      Choose between an instant switch (immediate on/off) or smooth transitions (fading effects for compatible lights).
+    - **Zigbee Sensitivity Adjustment:**  
+      The blueprint sets a Zigbee cluster attribute on your sensor based on your selected sensitivity (low, medium, or high).
+    - **Manual Override:**  
+      If devices remain on (e.g. from manual adjustments), the automation waits a defined time before resuming control.
+
+    Configure your sensor, timing, and target devices below to integrate your smart presence sensor seamlessly.
   domain: automation
   input:
     sensor_presence_sensor:
@@ -34,46 +45,47 @@ blueprint:
       name: "Light Sensor (Optional)"
       description: >
         Select a light sensor for detecting light/dark conditions.
-        This is usually a sensor entity with an attribute like `illuminance` or `last_illumination_state`.
-        Leave empty to use the sun position instead.
+        Typically, this sensor has attributes like `illuminance` or `last_illumination_state`.
+        Leave empty to use sun data instead.
       default: null
       selector:
         entity:
           domain: sensor
     sensor_use_light_sensor:
       name: "Use Light Sensor Instead of Sun"
-      description: "Enable this to use the light sensor for darkness detection instead of the sun position."
+      description: "Enable this to use the light sensor for darkness detection rather than sun data."
       default: false
       selector:
         boolean: {}
     mode_always_on_mode:
       name: "Always On Mode"
       description: >
-        Enable this to always turn on devices when presence is detected,
-        ignoring light conditions.
+        Enable this to always turn on devices when presence is detected, ignoring light conditions.
+        This mode is ideal for use with the Adaptive Lighting add-on.
+        For more information, see: https://github.com/basnijholt/adaptive-lighting
       default: false
       selector:
         boolean: {}
     mode_light_mode:
       name: "Lighting Mode"
-      description: "Choose between instant or smooth transitions (for lights only)."
+      description: "Select the switching style: instant (immediate on/off) or smooth (fade in/out)."
       default: "instant"
       selector:
         select:
           options:
             - value: "instant"
-              label: "Instant (On/Off Immediately)"
+              label: "Instant (Immediate On/Off)"
             - value: "smooth"
               label: "Smooth (Fade In/Out)"
     device_target_entities:
       name: "Devices to Control"
-      description: "Select the devices to control (lights, switches, outlets, etc.)."
+      description: "Select the devices (lights, switches, outlets, etc.) to be controlled."
       selector:
         target:
           entity: {}
     timing_sunset_offset:
       name: "Sunset Offset (Minutes)"
-      description: "Devices turn on this many minutes before sunset."
+      description: "Turn devices on this many minutes before sunset."
       default: 30
       selector:
         number:
@@ -82,7 +94,7 @@ blueprint:
           unit_of_measurement: "min"
     timing_sunrise_offset:
       name: "Sunrise Offset (Minutes)"
-      description: "Devices turn off this many minutes after sunrise."
+      description: "Turn devices off this many minutes after sunrise."
       default: 30
       selector:
         number:
@@ -91,7 +103,7 @@ blueprint:
           unit_of_measurement: "min"
     timing_motion_timeout:
       name: "Presence Timeout (Seconds)"
-      description: "Time in seconds before turning off devices after presence is lost."
+      description: "Time in seconds to wait after presence is lost before turning devices off."
       default: 120
       selector:
         number:
@@ -100,7 +112,7 @@ blueprint:
           unit_of_measurement: seconds
     timing_override_timeout:
       name: "Manual Override Duration (Minutes)"
-      description: "Time in minutes before automation resumes after manual device adjustment."
+      description: "Time in minutes to wait before automation resumes after manual device adjustment."
       default: 10
       selector:
         number:
@@ -109,7 +121,7 @@ blueprint:
           unit_of_measurement: minutes
     timing_transition_time:
       name: "Smooth Transition Time (Seconds)"
-      description: "Time in seconds for smooth transitions (for compatible lights)."
+      description: "Duration in seconds for smooth transitions (for lights that support fading)."
       default: 2
       selector:
         number:
@@ -141,15 +153,15 @@ action:
       light_mode: !input mode_light_mode
       target_entities: !input device_target_entities
       next_sunset: >
-        {{ as_datetime(state_attr("sun.sun", "next_setting")) - timedelta(minutes=sunset_offset | int) }}
+        {{ as_datetime(state_attr("sun.sun", "next_setting")) - timedelta(minutes=sunset_offset|int) }}
       next_sunrise: >
-        {{ as_datetime(state_attr("sun.sun", "next_rising")) + timedelta(minutes=sunrise_offset | int) }}
+        {{ as_datetime(state_attr("sun.sun", "next_rising")) + timedelta(minutes=sunrise_offset|int) }}
       is_dark: >
         {{ (states("sun.sun") == "below_horizon") or (utcnow() >= next_sunset and utcnow() < next_sunrise) }}
       light_sensor_state: >
-        {{ states(light_sensor | string) if light_sensor else none }}
+        {{ states(light_sensor|string) if light_sensor else none }}
       darkness_detected: >
-        {{ (always_on_mode or (light_sensor_state == "dark")) if use_light_sensor else is_dark }}
+        {{ always_on_mode or ((states(light_sensor|string) == "dark") if use_light_sensor else is_dark) }}
       selected_transition: >
         {{ transition_time if light_mode == "smooth" else 0 }}
 
