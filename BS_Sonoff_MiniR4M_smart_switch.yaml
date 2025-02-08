@@ -1,39 +1,36 @@
 blueprint:
-  name: "Smart Relay Control (Sonoff Mini R4M with SonoffLAN)"
+  name: "Smart Relay Control (Sonoff Mini R4M mit SonoffLAN)"
   description: >
-    This blueprint is designed for the Sonoff Mini R4M using the SonoffLAN integration.
+    Dieses Blueprint ermöglicht die Steuerung des Sonoff Mini R4M über die SonoffLAN-Integration.
+
+    **Modi:**
     
-    It supports two modes:
+    - **Detached Mode (Smarte Steuerung)**  
+      - Schaltet eine **smarte Entität** (z. B. Licht, Schalter, Szene).  
+      - **Single Tap:** Schaltet die Entität ein oder aus.  
+      - **Double Tap:** Optional eine Szene starten.  
+      - **Long Press:** Helligkeit anpassen (nur für Lichter).  
     
-    **Detached Mode (Smart Control):**
-      - Set the Mini R4M to detached relay mode so it sends a clear action signal ("single", "double", or "long")
-        without toggling its relay automatically.
-      - Control any smart entity:
-          - **Single Tap:**  
-            If the entity’s ID starts with "light.", it toggles via light.toggle; otherwise, it uses homeassistant.toggle.
-          - **Double Tap:** Optionally trigger a scene.
-          - **Long Press:** Adjusts brightness (only for lights) using the specified increment and direction.
-    
-    **Relay Mode (Direct Relay Control):**
-      - The action sensor triggers a direct toggle of the relay.
-      - Provide the relay (switch) entity representing the Mini R4M’s relay.
-    
-    **Setup:**
-      - **Action Sensor:** Select the sensor that reports the Mini R4M’s button events.
-      - For detached mode, assign your target smart entity.
-      - For relay mode, assign the Mini R4M’s relay (switch) entity.
-      
+    - **Relay Mode (Direkte Relaissteuerung)**  
+      - Der Taster toggelt direkt das interne Relais des Sonoff Mini R4M.
+
   domain: automation
 
   input:
     action_sensor:
       name: "Action Sensor"
+      description: >
+        Wähle den Sensor, der die Tastendrücke des Sonoff Mini R4M registriert.
       selector:
         entity:
           domain: sensor
 
     relay_mode:
-      name: "Control Mode"
+      name: "Steuermodus"
+      description: >
+        Wähle den Modus:
+          - **detached:** Smarte Steuerung eines Geräts oder einer Szene.
+          - **relay:** Direkte Steuerung des Sonoff Mini R4M Relais.
       default: detached
       selector:
         select:
@@ -42,26 +39,34 @@ blueprint:
             - relay
 
     target_entity:
-      name: "Target Entity (Smart Control)"
+      name: "Ziel-Entität (Smart Control)"
+      description: >
+        (Nur im 'detached' Modus) Wähle die Entität, die geschaltet werden soll.
       selector:
         entity: {}
 
     target_other:
-      name: "Relay Entity (Relay Mode)"
+      name: "Relais-Entität (Relay Mode)"
+      description: >
+        (Nur im 'relay' Modus) Wähle das Schaltelement des Sonoff Mini R4M.
       selector:
         entity:
           domain: switch
       default: ""
 
     double_tap_scene:
-      name: "Double Tap Scene"
+      name: "Szene für Doppeltipp"
+      description: >
+        (Nur im 'detached' Modus) Optional eine Szene auswählen, die bei Doppeltipp ausgelöst wird.
       selector:
         entity:
           domain: scene
       default: ""
 
     dimming_increment:
-      name: "Dimming Increment"
+      name: "Dimm-Schrittweite"
+      description: >
+        (Nur im 'detached' Modus für Lichter) Helligkeitsveränderung bei langem Tastendruck.
       default: 20
       selector:
         number:
@@ -70,7 +75,9 @@ blueprint:
           unit_of_measurement: "%"
 
     dimming_direction:
-      name: "Dimming Direction"
+      name: "Dimmrichtung"
+      description: >
+        (Nur im 'detached' Modus für Lichter) Soll die Helligkeit bei langem Tastendruck steigen oder sinken?
       default: up
       selector:
         select:
@@ -81,57 +88,65 @@ blueprint:
 trigger:
   - platform: state
     entity_id: !input action_sensor
+    to: "single"
+  - platform: state
+    entity_id: !input action_sensor
+    to: "double"
+  - platform: state
+    entity_id: !input action_sensor
+    to: "long"
 
 condition: []
 
 action:
+  - variables:
+      target_entity_value: !input target_entity
+      relay_mode_value: !input relay_mode
+      target_other_value: !input target_other
+      double_tap_scene_value: !input double_tap_scene
+
   - choose:
-      # Detached Mode: Smart Control
       - conditions:
           - condition: template
             value_template: >
-              {{ relay_mode == 'detached'
+              {{ relay_mode_value == 'detached'
                  and trigger.to_state.state in ['single', 'double', 'long']
-                 and target_entity is defined and target_entity | string | length > 0 }}
+                 and target_entity_value is defined
+                 and target_entity_value | string | length > 0 }}
         sequence:
           - choose:
-              # Single Tap: Toggle target entity.
               - conditions:
                   - condition: template
-                    value_template: "{{ target_entity.startswith('light.') }}"
+                    value_template: "{{ trigger.to_state.state == 'single' }}"
                 sequence:
-                  - service: light.toggle
-                    target:
-                      entity_id: !input target_entity
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ states(target_entity_value) == 'on' }}"
+                        sequence:
+                          - service: light.turn_off
+                            target:
+                              entity_id: "{{ target_entity_value }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ states(target_entity_value) == 'off' }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ target_entity_value }}"
               - conditions:
                   - condition: template
-                    value_template: "{{ not target_entity.startswith('light.') }}"
-                sequence:
-                  - service: homeassistant.toggle
-                    target:
-                      entity_id: !input target_entity
-
-          # Double Tap: Trigger scene if provided.
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: >
-                      {{ trigger.to_state.state == 'double' 
-                         and double_tap_scene is defined 
-                         and double_tap_scene | string | length > 0 }}
+                    value_template: "{{ trigger.to_state.state == 'double' and double_tap_scene_value | string | length > 0 }}"
                 sequence:
                   - service: scene.turn_on
                     target:
-                      entity_id: !input double_tap_scene
-
-          # Long Press: Adjust brightness (only if target is a light).
-          - choose:
+                      entity_id: "{{ double_tap_scene_value }}"
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.to_state.state == 'long' and target_entity.startswith('light.') }}"
+                    value_template: "{{ trigger.to_state.state == 'long' and target_entity_value.startswith('light.') }}"
                 sequence:
                   - variables:
-                      current_brightness: "{{ state_attr(target_entity, 'brightness') | int | default(0) }}"
+                      current_brightness: "{{ state_attr(target_entity_value, 'brightness') | int | default(0) }}"
                       new_brightness: >
                         {% if dimming_direction == 'up' %}
                           {{ [current_brightness + dimming_increment, 255] | min }}
@@ -140,20 +155,21 @@ action:
                         {% endif %}
                   - service: light.turn_on
                     target:
-                      entity_id: !input target_entity
+                      entity_id: "{{ target_entity_value }}"
                     data:
                       brightness: "{{ new_brightness }}"
 
-      # Relay Mode: Direct Relay Control
+  - choose:
       - conditions:
           - condition: template
             value_template: >
-              {{ relay_mode == 'relay'
+              {{ relay_mode_value == 'relay'
                  and trigger.to_state.state in ['single', 'double']
-                 and target_other is defined and target_other | string | length > 0 }}
+                 and target_other_value is defined
+                 and target_other_value | string | length > 0 }}
         sequence:
           - service: switch.toggle
             target:
-              entity_id: !input target_other
+              entity_id: "{{ target_other_value }}"
 
 mode: restart
